@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>音読マスター AI - 英語＆古典・国語 音読練習アプリ</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Noto Sans JP & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Noto Sans JP"', 'Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        english: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        },
+                        japanese: {
+                            50: '#fdf2f8',
+                            100: '#fce7f3',
+                            500: '#ec4899',
+                            600: '#db2777',
+                            700: '#be185d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* カスタムアニメーションとスクロールバー */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        .mic-recording {
+            animation: pulse-ring 1.5s infinite;
+        }
+        .gradient-english {
+            background: linear-gradient(135deg, #2563eb 0%, #06b6d4 100%);
+        }
+        .gradient-japanese {
+            background: linear-gradient(135deg, #be185d 0%, #f59e0b 100%);
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col selection:bg-blue-200">
+
+    <!-- 通知トースト（alertの代替） -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"></div>
+
+    <!-- ヘッダー -->
+    <header id="app-header" class="gradient-english text-white shadow-md transition-colors duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-white/20 p-2.5 rounded-2xl backdrop-blur-sm">
+                    <i class="fa-solid fa-microphone-lines text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-black tracking-tight flex items-center gap-2">
+                        音読マスター AI
+                        <span class="text-xs font-bold bg-white/25 px-2.5 py-0.5 rounded-full">Chromebook対応</span>
+                    </h1>
+                    <p class="text-xs sm:text-sm text-white/90 font-medium">カメラで文字起こし＆発音・音読チェック</p>
+                </div>
+            </div>
+
+            <!-- 教科モード切替スイッチ -->
+            <div class="bg-black/20 p-1.5 rounded-2xl flex items-center gap-1 backdrop-blur-sm">
+                <button id="btn-mode-en" onclick="switchMode('en')" class="px-4 py-2 rounded-xl text-sm sm:text-base font-bold transition-all flex items-center gap-2 bg-white text-blue-700 shadow-sm">
+                    <i class="fa-solid fa-earth-americas"></i>
+                    英語モード
+                </button>
+                <button id="btn-mode-ja" onclick="switchMode('ja')" class="px-4 py-2 rounded-xl text-sm sm:text-base font-bold transition-all flex items-center gap-2 text-white/90 hover:bg-white/10">
+                    <i class="fa-solid fa-torii-gate"></i>
+                    古典・国語モード
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ（Chromebook横画面に最適化された2カラムレイアウト） -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- 左カラム：テキスト入力・カメラ文字起こし・お手本再生 (7カラム) -->
+        <section class="lg:col-span-7 flex flex-col gap-5">
+            
+            <!-- サンプル教材＆カメラ取り込みバー -->
+            <div class="bg-white rounded-3xl p-4 sm:p-5 shadow-sm border border-slate-200/80">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                    <span class="text-sm font-bold text-slate-500 flex items-center gap-1.5">
+                        <i class="fa-solid fa-book-open text-blue-500" id="icon-sample"></i>
+                        教材を選ぶ・カメラで読み込む
+                    </span>
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="openCameraModal()" id="btn-open-camera" class="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-sm px-4 py-2.5 rounded-2xl shadow-sm transition-all flex items-center gap-2">
+                            <i class="fa-solid fa-camera"></i>
+                            カメラで文字起こし
+                        </button>
+                        <label class="bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 font-bold text-sm px-4 py-2.5 rounded-2xl cursor-pointer transition-all flex items-center gap-2">
+                            <i class="fa-solid fa-image"></i>
+                            画像を選択
+                            <input type="file" id="file-upload" accept="image/*" class="hidden" onchange="handleFileUpload(event)">
+                        </label>
+                    </div>
+                </div>
+
+                <!-- クイックサンプルボタン -->
+                <div id="sample-buttons" class="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+                    <!-- JSで動的に生成 -->
+                </div>
+            </div>
+
+            <!-- 音読テキストエリア -->
+            <div class="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200/80 flex-1 flex flex-col">
+                <div class="flex items-center justify-between mb-3">
+                    <label for="target-text" class="text-base font-bold text-slate-800 flex items-center gap-2">
+                        <span id="badge-step1" class="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-sm font-black">1</span>
+                        音読する文章（編集できます）
+                    </label>
+                    <button onclick="clearText()" class="text-xs font-bold text-slate-400 hover:text-rose-500 px-2.5 py-1.5 rounded-xl hover:bg-rose-50 transition-colors flex items-center gap-1">
+                        <i class="fa-solid fa-trash-can"></i> クリア
+                    </button>
+                </div>
+
+                <textarea id="target-text" rows="5" class="w-full p-4 rounded-2xl bg-slate-50 border-2 border-slate-200 focus:border-blue-500 focus:bg-white focus:outline-none text-lg sm:text-xl leading-relaxed font-medium text-slate-800 resize-none transition-all" placeholder="ここに音読したい英文や古文を入力するか、上の「カメラで文字起こし」ボタンからノートを撮影してください。"></textarea>
+
+                <!-- 古典・国語モード用：読み仮名（ひらがな）サポートエリア -->
+                <div id="reading-support-box" class="hidden mt-4 p-4 rounded-2xl bg-pink-50/70 border border-pink-200">
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                        <span class="text-xs font-bold text-pink-800 flex items-center gap-1.5">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i>
+                            読み仮名（音声読み上げ・判定用ひらがな）
+                        </span>
+                        <button onclick="convertToHiraganaAI()" id="btn-convert-kana" class="text-xs bg-pink-600 hover:bg-pink-700 text-white font-bold px-3 py-1.5 rounded-xl shadow-sm transition-all flex items-center gap-1.5">
+                            <i class="fa-solid fa-robot"></i>
+                            AIで古文の読み仮名を自動作成
+                        </button>
+                    </div>
+                    <textarea id="reading-text" rows="2" class="w-full p-3 rounded-xl bg-white border border-pink-200 focus:border-pink-500 focus:outline-none text-base text-slate-700 font-medium resize-none" placeholder="漢字や歴史的仮名遣いの読み方（例：はるはあけぼの...）がここに入ります"></textarea>
+                    <p class="text-[11px] text-pink-700/80 mt-1">※古典の「ゐ・ゑ・を」や「てふてふ→ちょうちょう」など、現代の読み方に直すと正確に判定されます。</p>
+                </div>
+
+                <!-- お手本音声コントロール -->
+                <div class="mt-5 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-bold text-slate-600"><i class="fa-solid fa-gauge-high mr-1 text-slate-400"></i>速さ:</span>
+                        <div class="inline-flex bg-slate-100 p-1 rounded-xl" id="speed-controls">
+                            <button onclick="setSpeed(0.75)" data-speed="0.75" class="speed-btn px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition-all">0.75x ゆっくり</button>
+                            <button onclick="setSpeed(1.0)" data-speed="1.0" class="speed-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-blue-600 shadow-sm transition-all">1.0x ふつう</button>
+                            <button onclick="setSpeed(1.25)" data-speed="1.25" class="speed-btn px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition-all">1.25x はやい</button>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <button onclick="playModelAudio()" id="btn-play-audio" class="bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-bold px-5 py-3 rounded-2xl shadow-sm transition-all flex items-center gap-2">
+                            <i class="fa-solid fa-volume-high"></i>
+                            お手本を聞く
+                        </button>
+                        <button onclick="stopModelAudio()" id="btn-stop-audio" class="hidden bg-slate-600 hover:bg-slate-700 active:scale-95 text-white font-bold px-4 py-3 rounded-2xl shadow-sm transition-all flex items-center gap-2">
+                            <i class="fa-solid fa-stop"></i>
+                            停止
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 右カラム：音読マイク録音＆リアルタイム採点結果 (5カラム) -->
+        <section class="lg:col-span-5 flex flex-col gap-5">
+            <div class="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200/80 flex-1 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                            <span id="badge-step2" class="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-sm font-black">2</span>
+                            声に出して読んでみよう！
+                        </h2>
+                        <span id="mic-status-badge" class="text-xs font-bold px-3 py-1 rounded-full bg-slate-100 text-slate-500">
+                            待機中
+                        </span>
+                    </div>
+
+                    <!-- 録音コントロールボタン -->
+                    <div class="flex flex-col items-center justify-center py-6 px-4 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 mb-5">
+                        <button onclick="toggleRecording()" id="btn-record" class="w-20 h-20 rounded-full bg-blue-600 hover:bg-blue-700 active:scale-95 text-white shadow-lg flex items-center justify-center text-3xl transition-all mb-3">
+                            <i class="fa-solid fa-microphone" id="icon-record"></i>
+                        </button>
+                        <p id="record-instruction" class="text-sm font-bold text-slate-700 text-center">
+                            マイクボタンを押して音読スタート
+                        </p>
+                        <p class="text-xs text-slate-400 mt-1 text-center">
+                            読み終わったらもう一度押して採点します
+                        </p>
+                    </div>
+
+                    <!-- スコア表示パネル -->
+                    <div id="score-panel" class="hidden mb-5 p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/80">
+                        <div class="flex items-center justify-between mb-2">
+                            <div>
+                                <span class="text-xs font-bold text-amber-800 block">今回の音読スコア</span>
+                                <span id="feedback-message" class="text-base sm:text-lg font-black text-amber-900">すばらしい発音です！</span>
+                            </div>
+                            <div class="text-right">
+                                <span id="score-number" class="text-4xl font-black text-orange-600">95</span>
+                                <span class="text-sm font-bold text-orange-600">点</span>
+                            </div>
+                        </div>
+                        <div class="w-full bg-amber-200/60 rounded-full h-2.5 overflow-hidden">
+                            <div id="score-bar" class="bg-orange-500 h-2.5 rounded-full transition-all duration-700" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- 判定結果（ハイライト表示） -->
+                    <div class="mb-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-bold text-slate-500">判定結果（緑：バッチリ / 赤：もう一息！）</span>
+                        </div>
+                        <div id="comparison-result" class="min-h-[110px] p-4 rounded-2xl bg-slate-50 border border-slate-200 text-base sm:text-lg leading-relaxed font-medium text-slate-400">
+                            ここに音読の判定結果が表示されます。
+                        </div>
+                    </div>
+
+                    <!-- 聞き取った生の音声テキスト -->
+                    <div>
+                        <span class="text-xs font-bold text-slate-400 block mb-1">マイクが聞き取った言葉：</span>
+                        <div id="recognized-raw" class="p-3 rounded-xl bg-slate-100/80 text-sm text-slate-600 min-h-[44px] italic">
+                            （まだ音声は入力されていません）
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- カメラ撮影モーダル -->
+    <div id="camera-modal" class="fixed inset-0 z-40 bg-slate-900/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl flex flex-col">
+            <div class="px-6 py-4 bg-slate-800 text-white flex items-center justify-between">
+                <h3 class="font-bold text-lg flex items-center gap-2">
+                    <i class="fa-solid fa-camera text-blue-400"></i>
+                    ノートやプリントを撮影して文字起こし
+                </h3>
+                <button onclick="closeCameraModal()" class="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="p-5 flex flex-col items-center">
+                <!-- ビデオプレビュー / 撮影画像プレビュー -->
+                <div class="relative w-full aspect-video bg-black rounded-2xl overflow-hidden mb-4 flex items-center justify-center">
+                    <video id="camera-video" autoplay playsinline class="w-full h-full object-cover"></video>
+                    <canvas id="camera-canvas" class="hidden w-full h-full object-contain"></canvas>
+                    
+                    <!-- ガイド枠 -->
+                    <div id="camera-guide" class="absolute inset-6 border-2 border-dashed border-white/60 rounded-xl pointer-events-none flex items-end justify-center pb-3">
+                        <span class="bg-black/60 text-white text-xs px-3 py-1 rounded-full backdrop-blur-sm">
+                            文字が枠内に収まるように映してください
+                        </span>
+                    </div>
+
+                    <!-- AI解析中ローディング -->
+                    <div id="ocr-loading" class="hidden absolute inset-0 bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center text-white p-4">
+                        <div class="w-12 h-12 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mb-3"></div>
+                        <p class="font-bold text-lg">AIが文字を読み取っています...</p>
+                        <p class="text-xs text-slate-300 mt-1">手書き文字や古文も認識できます</p>
+                    </div>
+                </div>
+
+                <!-- カメラ操作ボタン -->
+                <div id="camera-controls-live" class="flex flex-wrap items-center justify-center gap-3 w-full">
+                    <button onclick="capturePhoto()" class="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold px-8 py-3.5 rounded-2xl shadow-md transition-all flex items-center gap-2 text-base">
+                        <i class="fa-solid fa-camera"></i>
+                        シャッターを切る
+                    </button>
+                    <button onclick="switchCameraFacing()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-3.5 rounded-2xl transition-all flex items-center gap-2 text-sm">
+                        <i class="fa-solid fa-camera-rotate"></i>
+                        カメラ切替
+                    </button>
+                </div>
+
+                <!-- 撮影後の確認ボタン -->
+                <div id="camera-controls-preview" class="hidden flex flex-wrap items-center justify-center gap-3 w-full">
+                    <button onclick="retakePhoto()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-5 py-3 rounded-2xl transition-all flex items-center gap-2">
+                        <i class="fa-solid fa-rotate-left"></i>
+                        撮り直す
+                    </button>
+                    <button onclick="runOCRFromCanvas()" class="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold px-7 py-3 rounded-2xl shadow-md transition-all flex items-center gap-2">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        この画像から文字起こし！
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. アプリ状態とサンプルデータ定義
+        // ==========================================
+        const state = {
+            mode: 'en', // 'en' (英語) または 'ja' (古典・国語)
+            speechRate: 1.0,
+            isRecording: false,
+            recognition: null,
+            cameraStream: null,
+            facingMode: 'environment', // Chromebookのアウトカメラ優先
+            finalTranscript: ''
+        };
+
+        // 中学生向けサンプル教材データ
+        const SAMPLES = {
+            en: [
+                {
+                    title: '中1：自己紹介',
+                    text: 'Hello everyone. My name is Ken. I like playing soccer and listening to music. Nice to meet you!'
+                },
+                {
+                    title: '中2：将来の夢',
+                    text: 'I want to visit many countries in the future. So I am studying English very hard every day.'
+                },
+                {
+                    title: '中3：環境と未来',
+                    text: 'We have to protect our beautiful earth. Even small actions can make a big difference for our future.'
+                }
+            ],
+            ja: [
+                {
+                    title: '枕草子（春はあけぼの）',
+                    text: '春はあけぼの。やうやう白くなりゆく山際、少し明かりて、紫だちたる雲の細くたなびきたる。',
+                    reading: 'はるはあけぼの。ようようしろくなりゆくやまぎわ、すこしあかりて、むらさきだちたるくものほそくたなびきたる。'
+                },
+                {
+                    title: '平家物語（祇園精舎）',
+                    text: '祇園精舎の鐘の声、諸行無常の響きあり。沙羅双樹の花の色、盛者必衰の理をあらはす。',
+                    reading: 'ぎおんしょうじゃのかねのこえ、しょぎょうむじょうのひびきあり。さらそうじゅのはなのいろ、じょうしゃひっすいのことわりをあらわす。'
+                },
+                {
+                    title: '竹取物語（冒頭）',
+                    text: '今は昔、竹取の翁といふものありけり。野山にまじりて竹を取りつつ、よろづのことに使ひけり。',
+                    reading: 'いまはむかし、たけとりのおきなというものありけり。のやまにまじりてたけをとりつつ、よろずのことにつかいけり。'
+                }
+            ]
+        };
+
+        // ==========================================
+        // 2. 初期化処理
+        // ==========================================
+        window.onload = () => {
+            renderSampleButtons();
+            loadSample(0);
+            initSpeechRecognition();
+        };
+
+        // トースト通知の表示（alertの代わり）
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const colors = {
+                info: 'bg-slate-800 text-white border-slate-700',
+                success: 'bg-emerald-600 text-white border-emerald-500',
+                warning: 'bg-amber-500 text-white border-amber-400',
+                error: 'bg-rose-600 text-white border-rose-500'
+            };
+            const icons = {
+                info: 'fa-circle-info',
+                success: 'fa-circle-check',
+                warning: 'fa-triangle-exclamation',
+                error: 'fa-circle-xmark'
+            };
+
+            toast.className = `${colors[type]} border px-4 py-3 rounded-2xl shadow-lg flex items-center gap-3 text-sm font-bold pointer-events-auto transform transition-all duration-300 translate-y-[-10px] opacity-0`;
+            toast.innerHTML = `<i class="fa-solid ${icons[type]} text-lg"></i><span>${message}</span>`;
+            
+            container.appendChild(toast);
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-[-10px]', 'opacity-0');
+            });
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-[-10px]');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        // ==========================================
+        // 3. 教科モード切替とサンプル管理
+        // ==========================================
+        function switchMode(newMode) {
+            if (state.isRecording) stopRecording();
+            stopModelAudio();
+
+            state.mode = newMode;
+            const header = document.getElementById('app-header');
+            const btnEn = document.getElementById('btn-mode-en');
+            const btnJa = document.getElementById('btn-mode-ja');
+            const readingBox = document.getElementById('reading-support-box');
+            const btnRecord = document.getElementById('btn-record');
+            const badge1 = document.getElementById('badge-step1');
+            const badge2 = document.getElementById('badge-step2');
+
+            if (newMode === 'en') {
+                header.className = 'gradient-english text-white shadow-md transition-colors duration-300';
+                btnEn.className = 'px-4 py-2 rounded-xl text-sm sm:text-base font-bold transition-all flex items-center gap-2 bg-white text-blue-700 shadow-sm';
+                btnJa.className = 'px-4 py-2 rounded-xl text-sm sm:text-base font-bold transition-all flex items-center gap-2 text-white/90 hover:bg-white/10';
+                readingBox.classList.add('hidden');
+                btnRecord.className = 'w-20 h-20 rounded-full bg-blue-600 hover:bg-blue-700 active:scale-95 text-white shadow-lg flex items-center justify-center text-3xl transition-all mb-3';
+                badge1.className = 'w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-sm font-black';
+                badge2.className = 'w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-sm font-black';
+            } else {
+                header.className = 'gradient-japanese text-white shadow-md transition-colors duration-300';
+                btnJa.className = 'px-4 py-2 rounded-xl text-sm sm:text-base font-bold transition-all flex items-center gap-2 bg-white text-pink-700 shadow-sm';
+                btnEn.className = 'px-4 py-2 rounded-xl text-sm sm:text-base font-bold transition-all flex items-center gap-2 text-white/90 hover:bg-white/10';
+                readingBox.classList.remove('hidden');
+                btnRecord.className = 'w-20 h-20 rounded-full bg-pink-600 hover:bg-pink-700 active:scale-95 text-white shadow-lg flex items-center justify-center text-3xl transition-all mb-3';
+                badge1.className = 'w-7 h-7 rounded-full bg-pink-100 text-pink-700 flex items-center justify-center text-sm font-black';
+                badge2.className = 'w-7 h-7 rounded-full bg-pink-100 text-pink-700 flex items-center justify-center text-sm font-black';
+            }
+
+            renderSampleButtons();
+            loadSample(0);
+            resetResultUI();
+        }
+
+        function renderSampleButtons() {
+            const container = document.getElementById('sample-buttons');
+            const list = SAMPLES[state.mode];
+            const btnStyle = state.mode === 'en' 
+                ? 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200' 
+                : 'bg-pink-50 hover:bg-pink-100 text-pink-700 border-pink-200';
+
+            container.innerHTML = list.map((item, idx) => `
+                <button onclick="loadSample(${idx})" class="text-xs font-bold px-3 py-1.5 rounded-xl border ${btnStyle} transition-all">
+                    <i class="fa-solid fa-file-lines mr-1"></i>${item.title}
+                </button>
+            `).join('');
+        }
+
+        function loadSample(index) {
+            const item = SAMPLES[state.mode][index];
+            if (!item) return;
+            document.getElementById('target-text').value = item.text;
+            if (state.mode === 'ja') {
+                document.getElementById('reading-text').value = item.reading || '';
+            }
+            resetResultUI();
+        }
+
+        function clearText() {
+            document.getElementById('target-text').value = '';
+            document.getElementById('reading-text').value = '';
+            resetResultUI();
+        }
+
+        function resetResultUI() {
+            document.getElementById('score-panel').classList.add('hidden');
+            document.getElementById('comparison-result').innerHTML = '<span class="text-slate-400">ここに音読の判定結果が表示されます。</span>';
+            document.getElementById('recognized-raw').textContent = '（まだ音声は入力されていません）';
+        }
+
+        // ==========================================
+        // 4. カメラ撮影 ＆ Gemini AI 手書き文字起こし
+        // ==========================================
+        async function openCameraModal() {
+            const modal = document.getElementById('camera-modal');
+            modal.classList.remove('hidden');
+            retakePhoto();
+            await startCamera();
+        }
+
+        function closeCameraModal() {
+            stopCamera();
+            document.getElementById('camera-modal').classList.add('hidden');
+        }
+
+        async function startCamera() {
+            stopCamera();
+            const video = document.getElementById('camera-video');
+            try {
+                const constraints = {
+                    video: {
+                        facingMode: state.facingMode,
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    },
+                    audio: false
+                };
+                state.cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = state.cameraStream;
+            } catch (err) {
+                console.error('Camera Error:', err);
+                showToast('カメラを起動できませんでした。権限を確認するか「画像を選択」を使ってください。', 'error');
+                closeCameraModal();
+            }
+        }
+
+        function stopCamera() {
+            if (state.cameraStream) {
+                state.cameraStream.getTracks().forEach(track => track.stop());
+                state.cameraStream = null;
+            }
+        }
+
+        async function switchCameraFacing() {
+            state.facingMode = state.facingMode === 'environment' ? 'user' : 'environment';
+            await startCamera();
+        }
+
+        function capturePhoto() {
+            const video = document.getElementById('camera-video');
+            const canvas = document.getElementById('camera-canvas');
+            if (!video.videoWidth) return;
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // UIをプレビュー状態に切り替え
+            video.classList.add('hidden');
+            document.getElementById('camera-guide').classList.add('hidden');
+            canvas.classList.remove('hidden');
+            document.getElementById('camera-controls-live').classList.add('hidden');
+            document.getElementById('camera-controls-preview').classList.remove('hidden');
+        }
+
+        function retakePhoto() {
+            const video = document.getElementById('camera-video');
+            const canvas = document.getElementById('camera-canvas');
+            video.classList.remove('hidden');
+            document.getElementById('camera-guide').classList.remove('hidden');
+            canvas.classList.add('hidden');
+            document.getElementById('camera-controls-live').classList.remove('hidden');
+            document.getElementById('camera-controls-preview').classList.add('hidden');
+        }
+
+        // ファイルアップロードからの画像読み込み
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const base64Full = e.target.result;
+                const base64Data = base64Full.split(',')[1];
+                const mimeType = file.type || 'image/jpeg';
+                
+                showToast('画像を解析しています...', 'info');
+                await processImageWithGemini(base64Data, mimeType);
+                event.target.value = ''; // リセット
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function runOCRFromCanvas() {
+            const canvas = document.getElementById('camera-canvas');
+            const base64Full = canvas.toDataURL('image/jpeg', 0.85);
+            const base64Data = base64Full.split(',')[1];
+            
+            document.getElementById('ocr-loading').classList.remove('hidden');
+            await processImageWithGemini(base64Data, 'image/jpeg');
+            document.getElementById('ocr-loading').classList.add('hidden');
+            closeCameraModal();
+        }
+
+        // Gemini API (gemini-3-flash-preview) を使った高精度OCR＆古文読み仮名生成
+        async function processImageWithGemini(base64Data, mimeType) {
+            const apiKey = ""; // 実行環境から自動提供
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+            const prompt = state.mode === 'en'
+                ? `画像に書かれている英語の文章（手書きまたは印刷）を正確に文字起こししてください。
+                   改行や句読点を適切に整え、余計な説明や挨拶は一切含めず、抽出した英文のみを出力してください。`
+                : `画像に書かれている日本語または古典（古文・漢文書き下し文）の文章を正確に文字起こししてください。
+                   以下のJSON形式で出力してください。
+                   {
+                     "original": "抽出した元の文章（漢字や歴史的仮名遣いそのまま）",
+                     "reading": "音読・音声認識用の現代仮名遣いのひらがな読み（句読点含む。例：『てふてふ』は『ちょうちょう』、『春はあけぼの』は『はるはあけぼの』）"
+                   }`;
+
+            const payload = {
+                contents: [{
+                    role: "user",
+                    parts: [
+                        { text: prompt },
+                        { inlineData: { mimeType: mimeType, data: base64Data } }
+                    ]
+                }]
+            };
+
+            if (state.mode === 'ja') {
+                payload.generationConfig = {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            original: { type: "STRING" },
+                            reading: { type: "STRING" }
+                        },
+                        required: ["original", "reading"]
+                    }
+                };
+            }
+
+            try {
+                const response = await fetchWithRetry(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                const textResponse = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                if (!textResponse) throw new Error('文字を認識できませんでした');
+
+                if (state.mode === 'en') {
+                    document.getElementById('target-text').value = textResponse.trim();
+                } else {
+                    const parsed = JSON.parse(textResponse);
+                    document.getElementById('target-text').value = parsed.original || '';
+                    document.getElementById('reading-text').value = parsed.reading || '';
+                }
+
+                resetResultUI();
+                showToast('文字起こしが完了しました！', 'success');
+            } catch (error) {
+                console.error('OCR Error:', error);
+                showToast('文字の読み取りに失敗しました。明るい場所で撮り直してください。', 'error');
+            }
+        }
+
+        // 手入力した古文からAIで読み仮名を自動生成する機能
+        async function convertToHiraganaAI() {
+            const originalText = document.getElementById('target-text').value.trim();
+            if (!originalText) {
+                showToast('先に上の枠に文章を入力してください', 'warning');
+                return;
+            }
+
+            const btn = document.getElementById('btn-convert-kana');
+            const origHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> 変換中...';
+
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+            const prompt = `次の日本語（または古文）を、音読および音声認識の判定に使えるように「現代仮名遣いのひらがな」に変換してください。
+            漢字はすべてひらがなに開き、歴史的仮名遣い（例：やうやう→ようよう、あらはす→あらわす、いふ→いう）も現代の発音通りのひらがなにしてください。句読点（、。）は残し、ひらがなのみを出力してください。
+            
+            文章：
+            ${originalText}`;
+
+            try {
+                const response = await fetchWithRetry(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }]
+                    })
+                });
+                const result = await response.json();
+                const kana = result?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+                if (kana) {
+                    document.getElementById('reading-text').value = kana;
+                    showToast('読み仮名を作成しました！', 'success');
+                }
+            } catch (e) {
+                showToast('読み仮名の変換に失敗しました', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = origHtml;
+            }
+        }
+
+        // Exponential Backoff付きFetch
+        async function fetchWithRetry(url, options, retries = 3, delay = 1000) {
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const res = await fetch(url, options);
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    return res;
+                } catch (err) {
+                    if (i === retries - 1) throw err;
+                    await new Promise(r => setTimeout(r, delay * Math.pow(2, i)));
+                }
+            }
+        }
+
+        // ==========================================
+        // 5. お手本音声の再生 (Web Speech API - SpeechSynthesis)
+        // ==========================================
+        function setSpeed(speed) {
+            state.speechRate = speed;
+            document.querySelectorAll('.speed-btn').forEach(btn => {
+                if (parseFloat(btn.dataset.speed) === speed) {
+                    btn.className = 'speed-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-blue-600 shadow-sm transition-all';
+                } else {
+                    btn.className = 'speed-btn px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition-all';
+                }
+            });
+        }
+
+        function playModelAudio() {
+            if (!('speechSynthesis' in window)) {
+                showToast('お使いのブラウザは音声読み上げに対応していません', 'error');
+                return;
+            }
+
+            stopModelAudio();
+
+            // 古典・国語モードで読み仮名が入力されていればそちらを優先して正確に読ませる
+            let textToSpeak = document.getElementById('target-text').value.trim();
+            if (state.mode === 'ja') {
+                const readingVal = document.getElementById('reading-text').value.trim();
+                if (readingVal) textToSpeak = readingVal;
+            }
+
+            if (!textToSpeak) {
+                showToast('読み上げる文章を入力してください', 'warning');
+                return;
+            }
+
+            const utterance = new SpeechSynthesisUtterance(textToSpeak);
+            utterance.lang = state.mode === 'en' ? 'en-US' : 'ja-JP';
+            utterance.rate = state.speechRate;
+
+            // できるだけ自然な音声を選択
+            const voices = window.speechSynthesis.getVoices();
+            const targetLangPrefix = state.mode === 'en' ? 'en' : 'ja';
+            const preferredVoice = voices.find(v => v.lang.startsWith(targetLangPrefix) && (v.name.includes('Google') || v.name.includes('Natural'))) 
+                                || voices.find(v => v.lang.startsWith(targetLangPrefix));
+            if (preferredVoice) utterance.voice = preferredVoice;
+
+            utterance.onstart = () => {
+                document.getElementById('btn-play-audio').classList.add('hidden');
+                document.getElementById('btn-stop-audio').classList.remove('hidden');
+            };
+            utterance.onend = () => {
+                document.getElementById('btn-play-audio').classList.remove('hidden');
+                document.getElementById('btn-stop-audio').classList.add('hidden');
+            };
+            utterance.onerror = () => {
+                document.getElementById('btn-play-audio').classList.remove('hidden');
+                document.getElementById('btn-stop-audio').classList.add('hidden');
+            };
+
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function stopModelAudio() {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+            }
+            document.getElementById('btn-play-audio').classList.remove('hidden');
+            document.getElementById('btn-stop-audio').classList.add('hidden');
+        }
+
+        // ==========================================
+        // 6. 音声認識＆リアルタイム採点 (SpeechRecognition)
+        // ==========================================
+        function initSpeechRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                showToast('このブラウザは音声認識に対応していません。Chromeをお使いください。', 'error');
+                return;
+            }
+
+            const recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+
+            recognition.onstart = () => {
+                state.isRecording = true;
+                state.finalTranscript = '';
+                updateRecordingUI(true);
+            };
+
+            recognition.onresult = (event) => {
+                let interimTranscript = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        state.finalTranscript += event.results[i][0].transcript + ' ';
+                    } else {
+                        interimTranscript += event.results[i][0].transcript;
+                    }
+                }
+                const currentFull = (state.finalTranscript + interimTranscript).trim();
+                document.getElementById('recognized-raw').textContent = currentFull || '（聞き取り中...）';
+                
+                // リアルタイムに判定を更新
+                if (currentFull) {
+                    evaluateReading(currentFull, false);
+                }
+            };
+
+            recognition.onerror = (event) => {
+                console.error('Speech Recognition Error:', event.error);
+                if (event.error === 'not-allowed') {
+                    showToast('マイクの使用が許可されていません。アドレスバーの鍵アイコンからマイクを許可してください。', 'error');
+                }
+                stopRecording();
+            };
+
+            recognition.onend = () => {
+                if (state.isRecording) {
+                    // 意図せず切れた場合は停止処理へ
+                    stopRecording();
+                }
+            };
+
+            state.recognition = recognition;
+        }
+
+        function toggleRecording() {
+            if (state.isRecording) {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        }
+
+        function startRecording() {
+            const targetText = document.getElementById('target-text').value.trim();
+            if (!targetText) {
+                showToast('先に音読する文章を入力してください', 'warning');
+                return;
+            }
+            if (!state.recognition) {
+                initSpeechRecognition();
+                if (!state.recognition) return;
+            }
+
+            stopModelAudio();
+            state.recognition.lang = state.mode === 'en' ? 'en-US' : 'ja-JP';
+            
+            document.getElementById('score-panel').classList.add('hidden');
+            document.getElementById('recognized-raw').textContent = '（どうぞ声に出して読んでください...）';
+            
+            try {
+                state.recognition.start();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function stopRecording() {
+            state.isRecording = false;
+            if (state.recognition) {
+                try { state.recognition.stop(); } catch (e) {}
+            }
+            updateRecordingUI(false);
+
+            const spokenText = document.getElementById('recognized-raw').textContent;
+            if (spokenText && !spokenText.startsWith('（')) {
+                evaluateReading(spokenText, true);
+            }
+        }
+
+        function updateRecordingUI(recording) {
+            const btn = document.getElementById('btn-record');
+            const icon = document.getElementById('icon-record');
+            const badge = document.getElementById('mic-status-badge');
+            const instruction = document.getElementById('record-instruction');
+
+            if (recording) {
+                btn.className = 'w-20 h-20 rounded-full bg-rose-600 hover:bg-rose-700 text-white shadow-lg flex items-center justify-center text-3xl transition-all mb-3 mic-recording';
+                icon.className = 'fa-solid fa-stop';
+                badge.className = 'text-xs font-bold px-3 py-1 rounded-full bg-rose-100 text-rose-700 animate-pulse';
+                badge.textContent = '● 録音・聞き取り中';
+                instruction.textContent = '元気に音読しよう！（押すと終了・採点）';
+            } else {
+                const baseColor = state.mode === 'en' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-pink-600 hover:bg-pink-700';
+                btn.className = `w-20 h-20 rounded-full ${baseColor} active:scale-95 text-white shadow-lg flex items-center justify-center text-3xl transition-all mb-3`;
+                icon.className = 'fa-solid fa-microphone';
+                badge.className = 'text-xs font-bold px-3 py-1 rounded-full bg-slate-100 text-slate-500';
+                badge.textContent = '待機中';
+                instruction.textContent = 'マイクボタンを押して音読スタート';
+            }
+        }
+
+        // ==========================================
+        // 7. 音読の比較・ハイライト＆スコア算出アルゴリズム
+        // ==========================================
+        function evaluateReading(spokenText, isFinal) {
+            const resultBox = document.getElementById('comparison-result');
+            let score = 0;
+
+            if (state.mode === 'en') {
+                // --- 英語モード：単語単位の比較 ---
+                const originalText = document.getElementById('target-text').value.trim();
+                const targetWords = originalText.split(/\s+/).filter(w => w.length > 0);
+                
+                // 句読点を除いた小文字配列
+                const clean = (str) => str.toLowerCase().replace(/[^a-z0-9']/g, '');
+                const spokenWordsSet = new Set(spokenText.split(/\s+/).map(clean).filter(Boolean));
+                const spokenWordsList = spokenText.split(/\s+/).map(clean).filter(Boolean);
+
+                let matchedCount = 0;
+                const htmlParts = targetWords.map(origWord => {
+                    const cleanedOrig = clean(origWord);
+                    if (!cleanedOrig) return `<span>${origWord}</span>`;
+
+                    // 発話された単語リストに含まれているかチェック
+                    const foundIdx = spokenWordsList.indexOf(cleanedOrig);
+                    if (foundIdx !== -1) {
+                        matchedCount++;
+                        // 同じ単語の重複カウントを防ぐため消費する
+                        spokenWordsList.splice(foundIdx, 1);
+                        return `<span class="inline-block bg-emerald-100 text-emerald-800 border-b-2 border-emerald-500 px-1.5 py-0.5 rounded-md mx-0.5 my-0.5 font-bold">${origWord}</span>`;
+                    } else {
+                        return `<span class="inline-block bg-rose-100 text-rose-700 border-b-2 border-rose-400 px-1.5 py-0.5 rounded-md mx-0.5 my-0.5">${origWord}</span>`;
+                    }
+                });
+
+                resultBox.innerHTML = htmlParts.join(' ');
+                const validTotal = targetWords.filter(w => clean(w).length > 0).length;
+                score = validTotal > 0 ? Math.round((matchedCount / validTotal) * 100) : 0;
+
+            } else {
+                // --- 古典・国語モード：文字（ひらがな）単位の比較 ---
+                const rawTarget = document.getElementById('reading-text').value.trim() || document.getElementById('target-text').value.trim();
+                
+                // 句読点・空白を除去して比較用文字列を作成
+                const cleanJa = (str) => str.replace(/[\s、。！？「」『』・（）\(\)]/g, '');
+                const targetChars = Array.from(rawTarget);
+                const cleanTargetStr = cleanJa(rawTarget);
+                const cleanSpokenStr = cleanJa(spokenText);
+
+                // LCS（最長共通部分列）ベースで一致した文字インデックスを特定
+                const matchedIndices = computeLCSIndices(cleanTargetStr, cleanSpokenStr);
+                
+                let cleanCharPointer = 0;
+                const htmlParts = targetChars.map(char => {
+                    if (/[\s、。！？「」『』・（）\(\)]/.test(char)) {
+                        return `<span class="text-slate-400">${char}</span>`;
+                    }
+                    const isMatched = matchedIndices.has(cleanCharPointer);
+                    cleanCharPointer++;
+                    if (isMatched) {
+                        return `<span class="bg-emerald-100 text-emerald-800 border-b-2 border-emerald-500 px-0.5 rounded font-bold">${char}</span>`;
+                    } else {
+                        return `<span class="bg-rose-100 text-rose-700 border-b-2 border-rose-400 px-0.5 rounded">${char}</span>`;
+                    }
+                });
+
+                resultBox.innerHTML = htmlParts.join('');
+                score = cleanTargetStr.length > 0 ? Math.round((matchedIndices.size / cleanTargetStr.length) * 100) : 0;
+            }
+
+            // 終了時にスコアパネルを表示
+            if (isFinal) {
+                displayFinalScore(score);
+            }
+        }
+
+        // 日本語文字マッチング用のLCS（最長共通部分列）インデックス抽出
+        function computeLCSIndices(target, spoken) {
+            const m = target.length;
+            const n = spoken.length;
+            const dp = Array.from({ length: m + 1 }, () => new Uint16Array(n + 1));
+
+            for (let i = 1; i <= m; i++) {
+                for (let j = 1; j <= n; j++) {
+                    if (target[i - 1] === spoken[j - 1]) {
+                        dp[i][j] = dp[i - 1][j - 1] + 1;
+                    } else {
+                        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+                    }
+                }
+            }
+
+            const matchedTargetIndices = new Set();
+            let i = m, j = n;
+            while (i > 0 && j > 0) {
+                if (target[i - 1] === spoken[j - 1]) {
+                    matchedTargetIndices.add(i - 1);
+                    i--;
+                    j--;
+                } else if (dp[i - 1][j] > dp[i][j - 1]) {
+                    i--;
+                } else {
+                    j--;
+                }
+            }
+            return matchedTargetIndices;
+        }
+
+        function displayFinalScore(score) {
+            const panel = document.getElementById('score-panel');
+            const numEl = document.getElementById('score-number');
+            const barEl = document.getElementById('score-bar');
+            const msgEl = document.getElementById('feedback-message');
+
+            panel.classList.remove('hidden');
+            numEl.textContent = score;
+            setTimeout(() => {
+                barEl.style.width = `${score}%`;
+            }, 50);
+
+            if (score >= 90) {
+                msgEl.textContent = 'パーフェクト！完璧な音読です！🎉';
+            } else if (score >= 75) {
+                msgEl.textContent = 'すばらしい！とても上手に読めました！✨';
+            } else if (score >= 50) {
+                msgEl.textContent = 'いい調子！赤い部分を意識してもう一度挑戦しよう！👍';
+            } else {
+                msgEl.textContent = 'まずは「お手本を聞く」でリズムを確認してみよう！💪';
+            }
+        }
+    </script>
+</body>
+</html>
